@@ -58,3 +58,16 @@ Or in ftsab:
 
 The option `allow_other` lets other people access the filesystem. Without that
 only root will be able to see the files.
+
+----
+
+Saving the configuration
+------------------------
+
+The configuration is automatically saved to the specified config file when the filesystem
+is unmounted.  A manual save can also be triggered at any time by sending the mount.indexfs
+process a HUP signal:
+
+```
+killall -HUP mount.indexfs
+```
