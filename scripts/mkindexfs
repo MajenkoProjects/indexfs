@@ -1,0 +1,6 @@
+#!/bin/bash
+
+ROOT="$1"
+
+find "$ROOT" -type d -printf "D\t/%P\n"
+find "$ROOT" -type f -printf "F\t/%P\tfile://%p\n"
