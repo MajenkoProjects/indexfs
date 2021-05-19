@@ -385,7 +385,7 @@ static int fuse_setxattr(const char *path, const char *attr, const char *value, 
 
     if (file->url != NULL) free(file->url);
     file->url = malloc(len + 1);
-    memset(file->url, 0, len);
+    memset(file->url, 0, len + 1);
     memcpy(file->url, value, len);
     file->size = -1;
     return 0;
