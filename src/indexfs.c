@@ -11,6 +11,7 @@
 #include <curl/curl.h>
 #include <linux/fs.h>
 #include <errno.h>
+#include <signal.h>
 
 /* Index file layout:
 
@@ -454,6 +455,10 @@ static void fuse_save(void * __attribute__((unused)) dunno) {
     fclose(f);
 }
 
+void sighup(int sig) {
+    fuse_save(NULL);
+}
+
 static struct fuse_operations operations = {
 
     .mkdir      = fuse_mkdir,
@@ -479,6 +484,8 @@ static struct fuse_operations operations = {
 
 int main(int argc, char **argv) {
 
+    signal(SIGHUP, sighup);
+
     int opt;
 
     char *args[argc];
@@ -491,6 +498,11 @@ int main(int argc, char **argv) {
             args[argno++] = "-o";
             i++;
             args[argno++] = argv[i];
+            continue;
+        }
+
+        if (strcmp(argv[i], "-f") == 0) {
+            args[argno++] = "-f";
             continue;
         }
 
