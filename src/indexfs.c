@@ -139,11 +139,11 @@ static size_t getHeader(char *b, size_t size, size_t nitems, void *ud) {
         file->size = strtol(b + 16, 0, 10);
     }
 
-    if (strncasecmp(b, "location: ", 10) == 0) {
-        char *trim = strtok(b + 10, " \t\r\n");
-        if (file->url != NULL) free(file->url);
-        file->url = strdup(trim);
-    }
+//    if (strncasecmp(b, "location: ", 10) == 0) {
+//        char *trim = strtok(b + 10, " \t\r\n");
+//        if (file->url != NULL) free(file->url);
+//        file->url = strdup(trim);
+//    }
     return nitems;
 }
 
