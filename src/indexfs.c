@@ -39,6 +39,15 @@ struct block {
     void *buffer;
 };
 
+static int canWrite() {
+    struct fuse_context *ctx = fuse_get_context();
+
+    if (ctx->uid == getuid()) {
+        return 1;
+    }
+    return 0;
+}
+
 static file_t *getFileByName(const char *n) {
     for (file_t *scan = fileindex; scan; scan = scan->next) {
         if(!strcmp(scan->file, n)) {
@@ -154,6 +163,7 @@ static long getFileSize(struct index_s *file) {
 }
 
 static int fuse_truncate(const char *path, off_t offset) {
+    if (!canWrite()) return -EPERM;
     file_t *file = getFileByName(path);
     if (file == NULL) return -ENOENT;
     if (file->type != TFILE) return -EISDIR;
@@ -161,6 +171,7 @@ static int fuse_truncate(const char *path, off_t offset) {
 }
 
 static int fuse_mkdir(const char *path, mode_t mode) {
+    if (!canWrite()) return -EPERM;
     file_t *newdir = createDirectory(path);
     if (newdir == NULL) {
         return -EEXIST;
@@ -247,6 +258,7 @@ static int fuse_getattr(const char *path, struct stat *st) {
 }
 
 static int fuse_rmdir(const char *path) {
+    if (!canWrite()) return -EPERM;
     file_t *file = getFileByName(path);
     if (file == NULL) return -ENOENT;
     if (file->type != TDIR) return -ENOTDIR;
@@ -257,11 +269,13 @@ static int fuse_rmdir(const char *path) {
 static int fuse_open(const char *path, struct fuse_file_info *fi) {
     struct index_s *file = getFileByName(path);
 
+
     if (file == NULL) {
         if ((fi->flags & O_ACCMODE) == O_RDONLY) {
             return -ENOENT;
         }
 
+        if (!canWrite()) return -EPERM;
         file = createFile(path, NULL);
         return 0;
     }
@@ -274,20 +288,24 @@ static int fuse_release(const char *path, struct fuse_file_info *fi) {
 }
 
 static int fuse_write(const char *path, const char *data, size_t len, off_t offset, struct fuse_file_info *fi) {
+    if (!canWrite()) return -EPERM;
     return 0;
 }
 
 
 static int fuse_write_buf(const char *path, struct fuse_bufvec *buf, off_t off, struct fuse_file_info *fi) {
+    if (!canWrite()) return -EPERM;
     return 0;
 }
 
 
 static int fuse_utimens(const char *path, const struct timespec tv[2]) {
+    if (!canWrite()) return -EPERM;
     return 0;
 }
 
 static int fuse_create(const char *path, mode_t mode, struct fuse_file_info *finfo) {
+    if (!canWrite()) return -EPERM;
     file_t *file = getFileByName(path);
     if (file != NULL) return -EEXIST;
     createFile(path, NULL);
@@ -358,6 +376,7 @@ static int fuse_getxattr(const char *path, const char *attr, char *buffer, size_
 
 static int fuse_setxattr(const char *path, const char *attr, const char *value, size_t len, int flags) {
 
+    if (!canWrite()) return -EPERM;
     if (strcmp(attr, "url") != 0) return -ENOENT;
 
     file_t *file = getFileByName(path);
@@ -370,6 +389,7 @@ static int fuse_setxattr(const char *path, const char *attr, const char *value, 
 }
 
 static int fuse_rename(const char *src, const char *dst) { 
+    if (!canWrite()) return -EPERM;
     file_t *from = getFileByName(src);
     file_t *to = getFileByName(dst);
 
@@ -384,6 +404,7 @@ static int fuse_rename(const char *src, const char *dst) {
 }
 
 static int fuse_unlink(const char *path) {
+    if (!canWrite()) return -EPERM;
     struct index_s *file = getFileByName(path);
     if (file == NULL) return -ENOENT;
     deleteFileNode(file);
@@ -461,39 +482,39 @@ int main(int argc, char **argv) {
     int opt;
 
     char *args[argc];
-    int a = 0;
-    args[a++] = argv[0];
+    int argno = 0;
+    args[argno++] = argv[0];
+    char *mp = NULL;
 
-    while ((opt = getopt(argc, argv, "c:m:fdhsV")) != -1) {
-        switch (opt) {
-            case 'c':
-                config = optarg;
-                break;
-            case 'm':
-                args[a++] = optarg;
-                break;
-            case 'd':
-                args[a++] = "-d";
-                break;
-            case 'f':
-                args[a++] = "-f";
-                break;
-            case 'h':
-                args[a++] = "-h";
-                break;
-            case 's':
-                args[a++] = "-s";
-                break;
-            case 'V':
-                args[a++] = "-V";
-                break;
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-o") == 0) {
+            args[argno++] = "-o";
+            i++;
+            args[argno++] = argv[i];
+            continue;
+        }
+
+        if (argv[i][0] == '-') { // 
+            printf("Unknown option: %s\n", argv[i]);
+            return -1;
+        }
+    
+        if (config == NULL) {
+            config = argv[i];
+        } else if (mp == NULL) {
+            mp = argv[i];
+        } else {
+            printf("Extra invalid argument on command line\n");
+            return -1;
         }
     }
-
-    if (config == NULL) {
-        printf("Error: -c must be used to specify a config file location\n");
+    
+    if (config == NULL || mp == NULL) {
+        printf("Usage: %s [-o option...] indexfile mountpoint\n", argv[0]);
         return -1;
     }
 
-    return fuse_main( a, args, &operations, NULL );
+    args[argno++] = mp;
+
+    return fuse_main( argno, args, &operations, NULL );
 }

@@ -38,8 +38,23 @@ F<tab>File name<tab>URL
 To execute:
 
 ```
-indexfs -m /path/to/mount/point -c /path/to/config/file [other fuse parameters]
+mount.indexfs [-o options] /path/to/config /mount/point
 ```
 
 If the config file doesn't exist you will start with an empty filesystem and the file
 will be created the first time you unmount.
+
+You may also use it through mount, as long as mount.indexfs is installed in /sbin:
+
+```
+mount -t indexfs [-o options] /path/to/config /mount/point
+```
+
+Or in ftsab:
+
+```
+/path/to/config /mount/point indexfs allow_other 0 0
+```
+
+The option `allow_other` lets other people access the filesystem. Without that
+only root will be able to see the files.
