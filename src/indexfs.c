@@ -100,6 +100,8 @@ static file_t *createDirectory(const char *path) {
         return NULL;
     } 
 
+    printf("createDirectory(%s)\n", path);
+
     file = createFileNode(path, NULL, TDIR);
     return file;
 }
@@ -109,6 +111,7 @@ static file_t *createFile(const char *path, const char *url) {
     if (file != NULL) {
         return NULL;
     } 
+    printf("createFile(%s, %s)\n", path, url);
 
     file = createFileNode(path, url, TFILE);
     return file;
@@ -186,7 +189,10 @@ static int fuse_readdir(const char *path, void *buffer, fuse_fill_dir_t filler, 
         if (strncmp(scan->file, search, l) == 0) {
             char *sub = strdup(scan->file + l);
             char *fn = strtok(sub, "/");
-            filler(buffer, fn, NULL, 0);
+            char *more = strtok(NULL, "/");
+            if (more == NULL) {
+                filler(buffer, fn, NULL, 0);
+            }
             free(sub);
         }
     }
@@ -215,6 +221,8 @@ static int fuse_getattr(const char *path, struct stat *st) {
 
 
     file_t *file = getFileByName(path);
+
+    printf("[%s]\n", path);
 
     if (file == NULL) return -ENOENT;
 
