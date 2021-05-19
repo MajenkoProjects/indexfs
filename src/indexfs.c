@@ -21,6 +21,8 @@
 #define TDIR 0
 #define TFILE 1
 
+char *config = NULL;
+
 typedef struct index_s {
     int type;
     char *file;
@@ -385,7 +387,7 @@ static int fuse_unlink(const char *path) {
 }
 
 static void *fuse_init(struct fuse_conn_info *conn) {
-    FILE *f = fopen("index.fs", "r");
+    FILE *f = fopen(config, "r");
     if (f == NULL) return NULL;
 
     char entry[32768];
@@ -407,7 +409,11 @@ static void *fuse_init(struct fuse_conn_info *conn) {
 }
 
 static void fuse_save(void * __attribute__((unused)) dunno) {
-    FILE *f = fopen("index.fs", "w");
+    FILE *f = fopen(config, "w");
+    if (!f) {
+        printf("Error saving state!\n");
+        return;
+    }
     for (file_t *scan = fileindex; scan; scan = scan->next) {
         if (scan->type == TDIR) {
             fprintf(f, "D\t%s\n", scan->file);
@@ -447,5 +453,43 @@ static struct fuse_operations operations = {
 };
 
 int main(int argc, char **argv) {
-    return fuse_main( argc, argv, &operations, NULL );
+
+    int opt;
+
+    char *args[argc];
+    int a = 0;
+    args[a++] = argv[0];
+
+    while ((opt = getopt(argc, argv, "c:m:fdhsV")) != -1) {
+        switch (opt) {
+            case 'c':
+                config = optarg;
+                break;
+            case 'm':
+                args[a++] = optarg;
+                break;
+            case 'd':
+                args[a++] = "-d";
+                break;
+            case 'f':
+                args[a++] = "-f";
+                break;
+            case 'h':
+                args[a++] = "-h";
+                break;
+            case 's':
+                args[a++] = "-s";
+                break;
+            case 'V':
+                args[a++] = "-V";
+                break;
+        }
+    }
+
+    if (config == NULL) {
+        printf("Error: -c must be used to specify a config file location\n");
+        return -1;
+    }
+
+    return fuse_main( a, args, &operations, NULL );
 }
