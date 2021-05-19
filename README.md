@@ -36,4 +36,11 @@ or
 F<tab>File name<tab>URL
 ```
 
+To execute:
 
+```
+indexfs -m /path/to/mount/point -c /path/to/config/file [other fuse parameters]
+```
+
+If the config file doesn't exist you will start with an empty filesystem and the file
+will be created the first time you unmount.
