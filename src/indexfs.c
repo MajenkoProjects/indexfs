@@ -8,6 +8,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <curl/curl.h>
+#include <linux/fs.h>
 
 /* Index file layout:
 
@@ -34,7 +35,7 @@ static size_t getHeader(char *b, size_t size, size_t nitems, void *ud) {
 
     if (strncasecmp(b, "location: ", 10) == 0) {
         char *trim = strtok(b + 10, " \t\r\n");
-        free(file->url);
+        if (file->url != NULL) free(file->url);
         file->url = strdup(trim);
     }
     return nitems;
@@ -81,6 +82,40 @@ static void loadIndex() {
     fclose(f);
 }
 
+static void deleteFile(struct index_s *file) {
+    if (file != NULL) {
+        if (file == fileindex) {
+            fileindex = file->next;
+        } else {
+            for (struct index_s *scan = fileindex; scan; scan = scan->next) {
+                if (scan->next == file) {
+                    scan->next = file->next;
+                }
+            }
+        }
+
+        free(file->file);
+        if (file->url != NULL) free(file->url);
+        free(file);
+    }
+}
+
+static void appendFile(struct index_s *file) {
+    if (fileindex == NULL) {
+        fileindex = file;
+        return;
+    }
+
+    if (file != NULL) {
+        for (struct index_s *scan = fileindex; scan; scan = scan->next) {
+            if (scan->next == NULL) {
+                scan->next = file;
+                return;
+            }
+        }
+    }
+}
+
 static int is_directory(const char *path) {
     int l = strlen(path);
     char search[l + 1];
@@ -120,10 +155,14 @@ static int do_getattr(const char *path, struct stat *st) {
     } else {
         struct index_s *file = getFileByName(path);
         if (file) {
-            if (file->size == -1) {
-                getFileSize(file);
+            if (file->url == NULL) {
+                st->st_size = 0;
+            } else {
+                if (file->size == -1) {
+                    getFileSize(file);
+                }
+                st->st_size = file->size;
             }
-            st->st_size = file->size;
         }
         st->st_mode = S_IFREG | 0444;
         st->st_nlink = 1;
@@ -134,7 +173,7 @@ static int do_getattr(const char *path, struct stat *st) {
 static int do_readdir(const char *path, void *buffer, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi) {
 
     filler(buffer, ".", NULL, 0);
-    filler(buffer, "..", NULL, 0);
+    filler(buffer, ".", NULL, 0);
 
     int l = strlen(path);
     char search[l + 2];
@@ -156,6 +195,57 @@ static int do_readdir(const char *path, void *buffer, fuse_fill_dir_t filler, of
     return 0;
 }
 
+static int do_listxattr(const char *path, char *buffer, size_t len) {
+    if (strcmp(path, ".") == 0) return 0;
+    if (strcmp(path, "..") == 0) return 0;
+    if (is_directory(path)) return 0;
+
+    struct index_s *file = getFileByName(path);
+    if (file == NULL) return -1;
+    if (file->url == NULL) return 0;
+
+    if (len == 0) {
+        return 4;
+    }
+
+    strcpy(buffer, "url");
+    return 4;
+}
+
+static int do_getxattr(const char *path, const char *attr, char *buffer, size_t len) {
+    if (strcmp(path, ".") == 0) return 0;
+    if (strcmp(path, "..") == 0) return 0;
+    if (is_directory(path)) return 0;
+
+    struct index_s *file = getFileByName(path);
+    if (file == NULL) return -1;
+    if (file->url == NULL) return 0;
+    
+    if (len == 0) {
+        return strlen(file->url);
+    }
+
+    strcpy(buffer, file->url);
+    return strlen(file->url);
+}
+
+static int do_setxattr(const char *path, const char *attr, const char *value, size_t len, int flags) {
+
+    if (strcmp(attr, "url") != 0) {
+        return -1;
+    }
+
+    struct index_s *file = getFileByName(path);
+    if (file == NULL) {
+        return -1;
+    }
+
+    if (file->url != NULL) free(file->url);
+    file->url = strdup(value);
+    file->size = -1;
+    return 0;
+}
+
 struct block {
     size_t pos;
     void *buffer;
@@ -173,10 +263,8 @@ static int do_read( const char *path, char *buffer, size_t size, off_t offset, s
     char range[100];
     sprintf(range, "%ld-%ld", offset, offset + size - 1);
     struct index_s *file = getFileByName(path);
-    if (!file) {
-        return 0;
-    }
-
+    if (file == NULL) return 0;
+    if (file->url == NULL) return 0;
 
     struct block block;
 
@@ -197,10 +285,114 @@ static int do_read( const char *path, char *buffer, size_t size, off_t offset, s
     return block.pos;
 }
 
+static int do_rename(const char *src, const char *dst) { //, int flags) {
+    printf("Rename from [%s] to [%s]\n", src, dst);
+
+    struct index_s *from = getFileByName(src);
+    struct index_s *to = getFileByName(dst);
+
+//    if ((to != NULL) && (flags & RENAME_NOREPLACE)) {
+//        return -1;
+//    }
+//
+//    if ((to != NULL) && (flags & RENAME_EXCHANGE)) {
+//        free(from->file);
+//        from->file = strdup(dst);
+//        free(to->file);
+//        to->file = strdup(src);
+//        return 0;
+//    }
+
+    free(from->file);
+    from->file = strdup(dst);
+
+    deleteFile(to);
+
+    return 0;
+}
+
+static int do_unlink(const char *path) {
+    struct index_s *file = getFileByName(path);
+    if (file == NULL) return -1;
+    deleteFile(file);
+    return 0;
+}
+
+static int do_create(const char *path, mode_t mode, struct fuse_file_info *finfo) {
+    printf("Do create on %s\n", path);
+    struct index_s *file = getFileByName(path);
+    if (file != NULL) return -1;
+
+    file = (struct index_s *)malloc(sizeof(struct index_s));
+    file->file = strdup(path);
+    file->url = NULL;
+    file->size = 0;
+    appendFile(file);
+    return 0;
+}
+
+static int do_open(const char *path, struct fuse_file_info *fi) {
+    struct index_s *file = getFileByName(path);
+
+    printf("Open on %s with %o\n", path, fi->flags);
+    if (file == NULL) {
+        if ((fi->flags & O_ACCMODE) == O_RDONLY) {
+            return -1;
+        }
+        
+        file = (struct index_s *)malloc(sizeof(struct index_s));
+        file->file = strdup(path);
+        file->url = NULL;
+        file->size = 0;
+        appendFile(file);
+        return 0;
+    }
+    
+
+    return 0;
+    
+}
+
+static int do_write(const char *path, const char *data, size_t len, off_t offset, struct fuse_file_info *fi) {
+    printf("Write on %s\n", path);
+    return 0;
+}
+
+static int do_release(const char *path, struct fuse_file_info *fi) {
+    printf("Release on %s\n", path);
+    return 0;
+}
+
+static int do_write_buf(const char *path, struct fuse_bufvec *buf, off_t off, struct fuse_file_info *fi) {
+    printf("Write buffer on %s\n", path);
+    return 0;
+}
+
+static int do_truncate(const char *path, off_t offset) {
+    printf("Truncate on %s\n", path);
+    return 0;
+}
+
+static int do_utimens(const char *path, const struct timespec tv[2]) {
+    return 0;
+}
+
 static struct fuse_operations operations = {
     .getattr	= do_getattr,
     .readdir	= do_readdir,
     .read	= do_read,
+    .listxattr  = do_listxattr,
+    .getxattr   = do_getxattr,
+    .setxattr   = do_setxattr,
+    .rename     = do_rename,
+    .unlink     = do_unlink,
+    .create     = do_create,
+    .open       = do_open,
+    .write      = do_write,
+    .write_buf  = do_write_buf,
+    .release    = do_release,
+    .truncate   = do_truncate,
+    .utimens    = do_utimens,
 };
 
 
