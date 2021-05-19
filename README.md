@@ -71,3 +71,14 @@ process a HUP signal:
 ```
 killall -HUP mount.indexfs
 ```
+
+----
+
+URLs
+----
+
+Thanks to CURL being the backend almost any standard URI works. For example:
+
+* http://path and https://path
+* file:///path
+* ftp://user:password@site/path
