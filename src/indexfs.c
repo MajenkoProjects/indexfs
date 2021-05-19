@@ -157,20 +157,10 @@ static int fuse_truncate(const char *path, off_t offset) {
     return 0;
 }
 
-
-
-
-
-
-
-
-
-
 static int fuse_mkdir(const char *path, mode_t mode) {
     file_t *newdir = createDirectory(path);
     if (newdir == NULL) {
-        errno = EEXIST;
-        return -1;
+        return -EEXIST;
     }
     return 0;
 }

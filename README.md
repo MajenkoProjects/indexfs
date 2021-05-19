@@ -10,4 +10,30 @@ There is only a small amount of in-memory caching:
 * Any redirects are stored for later use
 * The remote file size is saved on first query
 
+While the filesystem data is readonly the filesystem itself is readwrite.  You can:
+
+* Create directories with mkdir
+* Delete directories with rmdir
+* Touch (and otherwise create) new empty files
+* Set the URL of a file with `setfattr -n url -v <url> <filename>`
+
+The state of the filesystem is stored at unmount time and reloaded at mount time
+in the file `index.fs` in the current directory (*needs fixing*)
+
+The format of the file is text based and consists of rows of:
+
+```
+D<tab>Directory name
+```
+
+And
+
+```
+F<tab>File name
+```
+or
+```
+F<tab>File name<tab>URL
+```
+
 
