@@ -18,7 +18,7 @@ While the filesystem data is readonly the filesystem itself is readwrite.  You c
 * Set the URL of a file with `setfattr -n url -v <url> <filename>`
 
 The state of the filesystem is stored at unmount time and reloaded at mount time
-in the file `index.fs` in the current directory (*needs fixing*)
+in the file `index.fs` in the current directory.
 
 The format of the file is text based and consists of rows of:
 
