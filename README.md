@@ -17,6 +17,7 @@ While the filesystem data is readonly the filesystem itself is readwrite.  You c
 * Touch (and otherwise create) new empty files
 * Set the URL of a file with `setfattr -n url -v <url> <filename>`
 * Trigger a refresh of the file size with `setfattr -n refresh -v 1 <filename>`
+* Manually set the file size with `setfattr -n size -v <size> <filename>`
 
 The state of the filesystem is stored at unmount time and reloaded at mount time.
 
@@ -34,6 +35,12 @@ F<tab>File name
 or
 ```
 F<tab>File name<tab>URL
+```
+
+Optionally the file size can be appended :
+
+```
+F<tab>File name<tab>URL<tab>Size
 ```
 
 To execute:
