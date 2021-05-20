@@ -153,6 +153,7 @@ static size_t getHeader(char *b, size_t size, size_t nitems, void *ud) {
 }
 
 static long getFileSize(struct index_s *file) {
+    file->size = 0; // Temporary, I hope
     CURL *curl = curl_easy_init();
     curl_easy_setopt(curl, CURLOPT_URL, file->url);
     curl_easy_setopt(curl, CURLOPT_HEADER, 0L);
@@ -359,7 +360,7 @@ static int fuse_listxattr(const char *path, char *buffer, size_t len) {
         return 12;
     }
 
-    memcpy(buffer, "url\0refresh\0", 12);
+    memcpy(buffer, "url\0refresh\0size\0", 17);
     return 12;
 }
 
@@ -393,6 +394,16 @@ static int fuse_getxattr(const char *path, const char *attr, char *buffer, size_
         return 1;
     }
 
+    if (strcmp(attr, "size") == 0) {
+        char temp[10];
+        snprintf(temp, 10, "%lu", file->size);
+        if (len == 0) {
+            return strlen(temp);
+        }
+        memcpy(buffer, temp, strlen(temp));
+        return strlen(temp);
+    }
+
     return 0;
 }
 
@@ -414,6 +425,14 @@ static int fuse_setxattr(const char *path, const char *attr, const char *value, 
 
     if (strcmp(attr, "refresh") == 0) {
         file->size = -1;
+        return 0;
+    }
+
+    if (strcmp(attr, "size") == 0) {
+        char temp[len + 1];
+        memcpy(temp, value, len);
+        temp[len] = 0;
+        file->size = strtoul(temp, NULL, 10);
         return 0;
     }
 
@@ -487,6 +506,7 @@ static void fuse_load_config() {
         char *type = strtok(entry, "\t\r\n");
         char *name = strtok(NULL, "\t\r\n");
         char *url = strtok(NULL, "\t\r\n");
+        char *size = strtok(NULL, "\t\r\n");
 
         if (name == NULL) continue;
 
@@ -502,6 +522,10 @@ static void fuse_load_config() {
                 file->size = -1;
             } else {
                 file = createFile(name, url);
+            }
+
+            if (size != NULL) {
+                file->size = strtoul(size, NULL, 10);
             }
             file->flags |= F_KEEP;
         } else if (type[0] == 'D') {
@@ -545,8 +569,11 @@ static void fuse_save(void * __attribute__((unused)) dunno) {
             if (scan->url == NULL) {
                 fprintf(f, "F\t%s\n", scan->file);
             } else {
-                fprintf(f, "F\t%s\t%s\n", scan->file, scan->url);
-
+                if (scan->size >= 0) {
+                    fprintf(f, "F\t%s\t%s\t%lu\n", scan->file, scan->url, scan->size);
+                } else {
+                    fprintf(f, "F\t%s\t%s\n", scan->file, scan->url);
+                }
             }
         }
     }
