@@ -12,6 +12,7 @@
 #include <linux/fs.h>
 #include <errno.h>
 #include <signal.h>
+#include <limits.h>
 
 /* Index file layout:
 
@@ -23,7 +24,7 @@
 #define TDIR 0
 #define TFILE 1
 
-char *config = NULL;
+char config[PATH_MAX] = {0};
 
 #define F_KEEP 0x0001
 
@@ -584,8 +585,8 @@ int main(int argc, char **argv) {
             return -1;
         }
     
-        if (config == NULL) {
-            config = argv[i];
+        if (config[0] == 0) {
+            char *c = realpath(argv[i], config);
         } else if (mp == NULL) {
             mp = argv[i];
         } else {
@@ -593,7 +594,7 @@ int main(int argc, char **argv) {
             return -1;
         }
     }
-    
+
     if (config == NULL || mp == NULL) {
         printf("Usage: %s [-o option...] indexfile mountpoint\n", argv[0]);
         return -1;
