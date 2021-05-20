@@ -16,6 +16,7 @@ While the filesystem data is readonly the filesystem itself is readwrite.  You c
 * Delete directories with rmdir
 * Touch (and otherwise create) new empty files
 * Set the URL of a file with `setfattr -n url -v <url> <filename>`
+* Trigger a refresh of the file size with `setfattr -n refresh -v 1 <filename>`
 
 The state of the filesystem is stored at unmount time and reloaded at mount time.
 
@@ -70,6 +71,15 @@ process a HUP signal:
 
 ```
 killall -HUP mount.indexfs
+```
+
+Reloading the configuration
+---------------------------
+
+You can manually reload the configuration by sending the USR1 signal. This will iteratively add any new files/directories, change any URLs, and remove any stale records.
+
+```
+killall -USR1 mount.indexfs
 ```
 
 ----
