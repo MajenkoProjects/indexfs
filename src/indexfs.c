@@ -443,6 +443,35 @@ static int fuse_unlink(const char *path) {
     return 0;
 }
 
+static int fuse_statfs(const char *path, struct statvfs *st) {
+
+    unsigned long count = 0;
+    unsigned long size = 0;
+    for (file_t *scan = fileindex; scan; scan = scan->next) {
+        if (scan->type == TFILE) {
+            if (scan->size == -1) {
+                getFileSize(scan);
+            }
+            size += scan->size;
+            count++;
+        }
+    }
+
+
+    st->f_bsize = 1024;
+    st->f_blocks = size/1024;
+    st->f_bfree = 0;
+    st->f_bavail = 0;
+    st->f_files = count;
+    st->f_ffree = 0;
+
+    return 0;
+}
+
+
+
+
+
 static void fuse_load_config() {
     FILE *f = fopen(config, "r");
     if (f == NULL) return;
@@ -553,6 +582,7 @@ static struct fuse_operations operations = {
     .unlink     = fuse_unlink,
     .init       = fuse_init,
     .destroy    = fuse_save,
+    .statfs     = fuse_statfs,
 };
 
 int main(int argc, char **argv) {
