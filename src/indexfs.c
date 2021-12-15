@@ -16,8 +16,9 @@
 
 /* Index file layout:
 
-/path/to/file https://url/to/file
-/path/to/other https://url/to/other
+D<tab>/path/to
+F<tab>/path/to/file<tab>https://url/to/file[<tab>Size]
+F<tab>/path/to/other<tab>https://url/to/other[<tab>Size]
 
 */
 
